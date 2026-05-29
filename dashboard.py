@@ -568,8 +568,9 @@ elif page == "📡 Anomaly Detection":
                     X_train, X_test, y_train, y_test = train_test_split(
                         X, y, test_size=0.3, random_state=42, stratify=y
                     )
-
-                    results = ad_mod.compare_anomaly_methods(X_train, X_test, y_test)
+                    
+                    y_test_binary = np.where(y_test == 'attack', 1, 0)
+                    results = ad_mod.compare_anomaly_methods(X_train, X_test, y_test_binary)
                     st.success("✅ Analysis complete!")
 
                     # Metrics
@@ -595,7 +596,6 @@ elif page == "📡 Anomaly Detection":
 
                     st.session_state['ad_results'] = results
                     st.session_state['ad_X_test']  = X_test
-                    y_test_binary = np.where(y_test == 'attack', 1, 0)
                     st.session_state['ad_y_bin']   = y_test_binary
 
                 except Exception as exc:
