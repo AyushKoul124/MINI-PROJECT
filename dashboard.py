@@ -1,6 +1,6 @@
 """
 🛡️ AI-Based Cybersecurity Dashboard
-Streamlit front-end for the AI-Based Cybersecurity Mini-Project (Project 16)
+Streamlit front-end for the AI-Based Cybersecurity Mini-Project
 """
 
 import sys
@@ -34,7 +34,7 @@ st.set_page_config(
     menu_items={
         "Get help": None,
         "Report a bug": None,
-        "About": "AI-Based Cybersecurity Dashboard – Project 16",
+        "About": "AI-Based Cybersecurity Dashboard",
     },
 )
 
@@ -239,7 +239,7 @@ with st.sidebar:
         <div style='text-align:center; padding: 1rem 0 .5rem;'>
             <span style='font-size:3rem;'>🛡️</span>
             <h2 style='color:#58a6ff; margin:.3rem 0 0; font-size:1.1rem;'>CyberSec AI Dashboard</h2>
-            <p style='color:#484f58; font-size:.75rem; margin:0;'>Project 16 – University Sétif 1</p>
+            <p style='color:#484f58; font-size:.75rem; margin:0;'>MIET (Autonomous)</p>
         </div>
         <hr style='border-color:#30363d; margin:.7rem 0 1rem;'>
         """,
@@ -297,8 +297,8 @@ if page == "🏠 Overview":
         """
         <div class='hero-banner'>
             <h1>🛡️ AI-Based Cybersecurity Dashboard</h1>
-            <p>Project 16 – Implementation of an AI-Based Cybersecurity Use Case &nbsp;|&nbsp;
-            Security &amp; Privacy – Medicine &amp; Big Data &nbsp;|&nbsp; University Sétif 1, 2025/2026</p>
+            <p>Implementation of an AI-Based Cybersecurity Use Case &nbsp;|&nbsp;
+            Model Institute of Engineering and Technology (Autonomous)</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -388,7 +388,7 @@ if page == "🏠 Overview":
         """
 ┌─────────────────────────────────────────────────────────────────┐
 │                  AI-Based Cybersecurity System                  │
-│                        (Project 16)                             │
+│                                                                 │
 └──────────┬──────────────┬──────────────┬────────────────────────┘
            │              │              │               │
    ┌───────▼────┐  ┌──────▼──────┐ ┌────▼──────┐ ┌─────▼────────┐
@@ -413,19 +413,20 @@ if page == "🏠 Overview":
     )
 
     # ---- Team ----
-    st.markdown("<div class='section-title'>👩‍💻 Authors</div>", unsafe_allow_html=True)
-    a1, a2 = st.columns(2)
-    for col, name, role in [
-        (a1, "DAHEL Rahma",    "Security & Privacy – Medicine & Big Data"),
-        (a2, "GHEDJATI Zainab","Security & Privacy – Medicine & Big Data"),
+    st.markdown("<div class='section-title'>👨‍💻 Authors</div>", unsafe_allow_html=True)
+    a1, a2, a3 = st.columns(3)
+    for col, name in [
+        (a1, "Ayush Koul"),
+        (a2, "Vinayak Singh Jamwal"),
+        (a3, "Prajwal Shan"),
     ]:
         col.markdown(
             f"""
             <div class='info-card' style='text-align:center;'>
-                <div style='font-size:2.2rem;'>👩‍🔬</div>
+                <div style='font-size:2.2rem;'>👨‍💻</div>
                 <strong style='color:#79c0ff;'>{name}</strong><br>
-                <span style='font-size:.82rem; color:#8b949e;'>{role}</span><br>
-                <span style='font-size:.78rem; color:#484f58;'>Université Sétif 1 — 2025/2026</span>
+                <span style='font-size:.82rem; color:#8b949e;'>AI-Based Cybersecurity Mini-Project</span><br>
+                <span style='font-size:.78rem; color:#484f58;'>MIET (Autonomous)</span>
             </div>
             """,
             unsafe_allow_html=True,
