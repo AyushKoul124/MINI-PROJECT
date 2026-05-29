@@ -1,301 +1,446 @@
 """
-Adversarial Attacks on AI-Based Intrusion Detection
-Demonstrating vulnerabilities of ML models to adversarial examples
+Adversarial Attacks on AI-Based Intrusion Detection Systems.
+
+Improvements over v1
+---------------------
+* pathlib for all file-system paths (project root config)
+* Python logging throughout
+* Professional plot aesthetics (seaborn-v0_8-darkgrid, custom palette)
+* Uses config for hyperparameters (RANDOM_STATE, TEST_SIZE, …)
+* main() loads NSL-KDD via data_loader, falls back to synthetic data
+* plot_adversarial_comparison() returns Figure as well as saving to disk
 """
+
+import sys
+import logging
+import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-import warnings
-warnings.filterwarnings('ignore')
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+
+warnings.filterwarnings("ignore")
+
+# ── Make sure the project root is on sys.path so config is importable ─────────
+_SRC_DIR  = Path(__file__).parent
+_ROOT_DIR = _SRC_DIR.parent
+if str(_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_ROOT_DIR))
+
+import config  # noqa: E402
+
+# ── Logger ────────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+# ── Plot defaults ─────────────────────────────────────────────────────────────
+try:
+    plt.style.use(config.PLOT_STYLE)
+except OSError:
+    plt.style.use("seaborn-v0_8-darkgrid")
+
+_PALETTE = getattr(config, "COLOR_PALETTE", ["#6C63FF", "#FF6584", "#43D8C9", "#FFC857"])
+_DPI     = getattr(config, "FIGURE_DPI", 150)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
 class AdversarialAttackSimulator:
     """
-    Simulate adversarial attacks on IDS models
+    Simulates common adversarial perturbations on network-traffic feature vectors.
+
+    Parameters
+    ----------
+    model  : trained sklearn classifier with .predict()
+    scaler : fitted StandardScaler (or compatible) used before prediction
     """
-    
+
     def __init__(self, model, scaler):
-        """
-        Initialize adversarial attack simulator
-        
-        Args:
-            model: Trained IDS model
-            scaler: Fitted StandardScaler
-        """
-        self.model = model
+        self.model  = model
         self.scaler = scaler
-    
-    def fgsm_attack(self, X, epsilon=0.1):
+        logger.info("AdversarialAttackSimulator initialised — model=%s", type(model).__name__)
+
+    # ── Attack primitives ─────────────────────────────────────────────────────
+
+    def fgsm_attack(self, X: np.ndarray, epsilon: float = 0.1) -> np.ndarray:
         """
-        Fast Gradient Sign Method (FGSM) attack simulation
-        
-        Args:
-            X: Original features
-            epsilon: Perturbation magnitude
-            
-        Returns:
-            Perturbed features
+        Fast Gradient Sign Method (approximate, sign taken from random gradient
+        direction since we target a black-box model).
         """
-        # Add small random perturbations
-        perturbation = np.random.randn(*X.shape) * epsilon
-        X_adversarial = X + perturbation
-        
-        # Ensure non-negative values for meaningful features
-        X_adversarial = np.maximum(X_adversarial, 0)
-        
-        return X_adversarial
-    
-    def random_noise_attack(self, X, noise_level=0.05):
-        """
-        Add random noise to features
-        
-        Args:
-            X: Original features
-            noise_level: Proportion of noise to add
-            
-        Returns:
-            Noisy features
-        """
-        noise = np.random.normal(0, noise_level, X.shape)
+        perturbation    = np.sign(np.random.randn(*X.shape)) * epsilon
+        X_adversarial   = X + perturbation
+        return np.maximum(X_adversarial, 0)
+
+    def random_noise_attack(self, X: np.ndarray, noise_level: float = 0.05) -> np.ndarray:
+        """Multiplicative Gaussian noise (simulates sensor jitter)."""
+        noise  = np.random.normal(0, noise_level, X.shape)
         X_noisy = X + X * noise
-        X_noisy = np.maximum(X_noisy, 0)
-        
-        return X_noisy
-    
-    def feature_manipulation_attack(self, X, feature_indices, manipulation_factor=0.5):
-        """
-        Manipulate specific features to evade detection
-        
-        Args:
-            X: Original features
-            feature_indices: Indices of features to manipulate
-            manipulation_factor: How much to change features
-            
-        Returns:
-            Manipulated features
-        """
+        return np.maximum(X_noisy, 0)
+
+    def feature_manipulation_attack(
+        self,
+        X: np.ndarray,
+        feature_indices: list[int],
+        manipulation_factor: float = 0.5,
+    ) -> np.ndarray:
+        """Scale selected features by *manipulation_factor* (mimics evasion by an attacker
+        who knows which features the IDS monitors)."""
         X_manipulated = X.copy()
-        
         for idx in feature_indices:
-            # Reduce suspicious feature values
-            X_manipulated[:, idx] = X_manipulated[:, idx] * manipulation_factor
-        
+            X_manipulated[:, idx] *= manipulation_factor
         return X_manipulated
-    
-    def evaluate_robustness(self, X_test, y_test, attack_type='fgsm', **kwargs):
+
+    # ── Robustness evaluation ─────────────────────────────────────────────────
+
+    def evaluate_robustness(
+        self,
+        X_test,
+        y_test,
+        attack_type: str = "fgsm",
+        **kwargs,
+    ) -> dict:
         """
-        Evaluate model robustness against adversarial attacks
-        
-        Args:
-            X_test: Test features
-            y_test: True labels
-            attack_type: Type of attack ('fgsm', 'random_noise', 'feature_manipulation')
-            **kwargs: Additional parameters for specific attacks
-            
-        Returns:
-            Results dictionary
+        Evaluate how well the model withstands a given adversarial attack.
+
+        Returns a dict with:
+            attack_type, original_accuracy, adversarial_accuracy,
+            accuracy_drop, evasion_rate, successful_evasions, total_samples
         """
-        # Convert to numpy if pandas DataFrame
         if isinstance(X_test, pd.DataFrame):
             X_test_np = X_test.values
         else:
-            X_test_np = X_test
-        
-        # Original predictions
+            X_test_np = np.asarray(X_test)
+
         X_test_scaled = self.scaler.transform(X_test_np)
         y_pred_original = self.model.predict(X_test_scaled)
-        
-        # Generate adversarial examples
-        if attack_type == 'fgsm':
-            epsilon = kwargs.get('epsilon', 0.1)
+
+        # ── Generate adversarial samples ──────────────────────────────────────
+        if attack_type == "fgsm":
+            epsilon      = kwargs.get("epsilon", 0.1)
             X_adversarial = self.fgsm_attack(X_test_np, epsilon)
-        elif attack_type == 'random_noise':
-            noise_level = kwargs.get('noise_level', 0.05)
+            logger.info("FGSM attack — epsilon=%.3f", epsilon)
+        elif attack_type == "random_noise":
+            noise_level   = kwargs.get("noise_level", 0.05)
             X_adversarial = self.random_noise_attack(X_test_np, noise_level)
-        elif attack_type == 'feature_manipulation':
-            feature_indices = kwargs.get('feature_indices', [0, 1, 2])
-            manipulation_factor = kwargs.get('manipulation_factor', 0.5)
-            X_adversarial = self.feature_manipulation_attack(
+            logger.info("Random noise attack — noise_level=%.3f", noise_level)
+        elif attack_type == "feature_manipulation":
+            feature_indices    = kwargs.get("feature_indices", [0, 1, 2])
+            manipulation_factor = kwargs.get("manipulation_factor", 0.5)
+            X_adversarial       = self.feature_manipulation_attack(
                 X_test_np, feature_indices, manipulation_factor
             )
+            logger.info(
+                "Feature manipulation attack — features=%s  factor=%.3f",
+                feature_indices, manipulation_factor,
+            )
         else:
-            raise ValueError(f"Unknown attack type: {attack_type}")
-        
-        # Predictions on adversarial examples
-        X_adversarial_scaled = self.scaler.transform(X_adversarial)
-        y_pred_adversarial = self.model.predict(X_adversarial_scaled)
-        
-        # Calculate metrics
-        if hasattr(self.model, 'classes_'):
-            # For sklearn models
-            original_accuracy = np.mean(y_pred_original == y_test)
-            adversarial_accuracy = np.mean(y_pred_adversarial == y_test)
-        else:
-            original_accuracy = np.mean(y_pred_original == y_test)
-            adversarial_accuracy = np.mean(y_pred_adversarial == y_test)
-        
-        # Calculate evasion rate (attacks that changed predictions)
-        prediction_changes = np.sum(y_pred_original != y_pred_adversarial)
-        evasion_rate = prediction_changes / len(y_test)
-        
-        # Calculate successful evasions (attacks predicted as normal that were originally attacks)
-        if isinstance(y_test, pd.Series):
-            y_test_binary = (y_test == 'attack').values
-        else:
-            y_test_binary = y_test
-        
-        successful_evasions = np.sum(
-            (y_pred_original == y_test_binary) & 
-            (y_pred_adversarial != y_test_binary)
-        )
-        
-        results = {
-            'attack_type': attack_type,
-            'original_accuracy': original_accuracy,
-            'adversarial_accuracy': adversarial_accuracy,
-            'accuracy_drop': original_accuracy - adversarial_accuracy,
-            'evasion_rate': evasion_rate,
-            'successful_evasions': successful_evasions,
-            'total_samples': len(y_test)
+            raise ValueError(f"Unknown attack type: {attack_type!r}")
+
+        X_adv_scaled    = self.scaler.transform(X_adversarial)
+        y_pred_adv      = self.model.predict(X_adv_scaled)
+
+        y_test_arr      = np.asarray(y_test)
+        original_acc    = np.mean(y_pred_original == y_test_arr)
+        adversarial_acc = np.mean(y_pred_adv      == y_test_arr)
+        pred_changes    = np.sum(y_pred_original != y_pred_adv)
+        evasion_rate    = pred_changes / len(y_test_arr)
+
+        # Successful evasion = was correctly classified → now wrong
+        correct_before  = y_pred_original == y_test_arr
+        wrong_after     = y_pred_adv      != y_test_arr
+        successful_evas = int(np.sum(correct_before & wrong_after))
+
+        result = {
+            "attack_type":          attack_type,
+            "original_accuracy":    float(original_acc),
+            "adversarial_accuracy": float(adversarial_acc),
+            "accuracy_drop":        float(original_acc - adversarial_acc),
+            "evasion_rate":         float(evasion_rate),
+            "successful_evasions":  successful_evas,
+            "total_samples":        int(len(y_test_arr)),
         }
-        
-        return results
-    
-    def print_robustness_report(self, results):
-        """
-        Print robustness evaluation report
-        """
-        print(f"\n{'='*60}")
-        print(f"ADVERSARIAL ROBUSTNESS EVALUATION")
-        print(f"Attack Type: {results['attack_type'].upper()}")
-        print(f"{'='*60}")
-        print(f"Original Accuracy:      {results['original_accuracy']:.4f} ({results['original_accuracy']*100:.2f}%)")
-        print(f"Adversarial Accuracy:   {results['adversarial_accuracy']:.4f} ({results['adversarial_accuracy']*100:.2f}%)")
-        print(f"Accuracy Drop:          {results['accuracy_drop']:.4f} ({results['accuracy_drop']*100:.2f}%)")
-        print(f"Evasion Rate:           {results['evasion_rate']:.4f} ({results['evasion_rate']*100:.2f}%)")
-        print(f"Successful Evasions:    {results['successful_evasions']} / {results['total_samples']}")
-
-
-def demonstrate_adversarial_attacks():
-    """
-    Demonstrate adversarial attacks on IDS
-    """
-    print("\n" + "="*70)
-    print("ADVERSARIAL ATTACKS DEMONSTRATION")
-    print("="*70)
-    
-    # Import and generate data
-    from intrusion_detection import IntrusionDetectionSystem, generate_synthetic_network_traffic
-    
-    df = generate_synthetic_network_traffic(n_samples=5000, attack_ratio=0.3)
-    X = df.drop('label', axis=1)
-    y = df['label']
-    
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42, stratify=y
-    )
-    
-    # Train model
-    print("\nTraining baseline model...")
-    ids = IntrusionDetectionSystem(algorithm='random_forest')
-    ids.train(X_train, y_train)
-    
-    # Evaluate original performance
-    metrics, y_pred = ids.evaluate(X_test, y_test)
-    print(f"\nBaseline Accuracy: {metrics['accuracy']:.4f}")
-    
-    # Initialize adversarial attack simulator
-    simulator = AdversarialAttackSimulator(ids.model, ids.scaler)
-    
-    # Test different attacks
-    attack_types = [
-        ('fgsm', {'epsilon': 0.1}),
-        ('random_noise', {'noise_level': 0.05}),
-        ('feature_manipulation', {'feature_indices': [0, 1, 2, 5], 'manipulation_factor': 0.5})
-    ]
-    
-    all_results = []
-    
-    for attack_type, params in attack_types:
-        print(f"\n{'#'*70}")
-        print(f"Testing {attack_type.upper().replace('_', ' ')} Attack")
-        print(f"{'#'*70}")
-        
-        # Convert labels for binary evaluation
-        y_test_binary = ids.label_encoder.transform(y_test)
-        
-        results = simulator.evaluate_robustness(
-            X_test, y_test_binary, 
-            attack_type=attack_type, 
-            **params
+        logger.info(
+            "%s → orig_acc=%.4f  adv_acc=%.4f  drop=%.4f  evasion=%.4f",
+            attack_type, original_acc, adversarial_acc,
+            original_acc - adversarial_acc, evasion_rate,
         )
+        return result
+
+    def print_robustness_report(self, results: dict) -> None:
+        """Pretty-print a single attack robustness result."""
+        print(f"\n{'─'*42}")
+        print(f"  Attack type          : {results['attack_type']}")
+        print(f"  Original Accuracy    : {results['original_accuracy']:.4f}")
+        print(f"  Adversarial Accuracy : {results['adversarial_accuracy']:.4f}")
+        print(f"  Accuracy Drop        : {results['accuracy_drop']:.4f}")
+        print(f"  Evasion Rate         : {results['evasion_rate']:.4f}")
+        print(f"  Successful Evasions  : {results['successful_evasions']} / {results['total_samples']}")
+        print(f"{'─'*42}\n")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Public helper functions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def plot_adversarial_comparison(
+    all_results: list[dict],
+    save_dir: Path | str | None = None,
+) -> plt.Figure:
+    """
+    Grouped bar chart + accuracy-drop line comparing multiple adversarial attacks.
+
+    Parameters
+    ----------
+    all_results : list of dicts returned by evaluate_robustness()
+    save_dir    : directory to save the PNG (default: config.DOCS_DIR)
+
+    Returns
+    -------
+    matplotlib Figure
+    """
+    if save_dir is None:
+        save_dir = getattr(config, "DOCS_DIR", _ROOT_DIR / "docs")
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    attack_labels   = [r["attack_type"].replace("_", " ").title() for r in all_results]
+    original_accs   = [r["original_accuracy"]    for r in all_results]
+    adversarial_accs = [r["adversarial_accuracy"] for r in all_results]
+    accuracy_drops  = [r["accuracy_drop"]         for r in all_results]
+    evasion_rates   = [r["evasion_rate"]           for r in all_results]
+
+    x     = np.arange(len(attack_labels))
+    width = 0.30
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle("Adversarial Robustness Analysis", fontsize=15, fontweight="bold", y=1.02)
+
+    # ── Left: accuracy comparison ─────────────────────────────────────────────
+    ax = axes[0]
+    bars_orig = ax.bar(x - width / 2, original_accs,   width, label="Original",   color=_PALETTE[0], alpha=0.88, edgecolor="white")
+    bars_adv  = ax.bar(x + width / 2, adversarial_accs, width, label="Adversarial", color=_PALETTE[1], alpha=0.88, edgecolor="white")
+
+    for bars in (bars_orig, bars_adv):
+        for bar in bars:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.008,
+                f"{bar.get_height():.3f}",
+                ha="center", va="bottom", fontsize=8.5, fontweight="bold",
+            )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(attack_labels, fontsize=10, rotation=12)
+    ax.set_ylim(0, 1.15)
+    ax.set_ylabel("Accuracy", fontsize=12)
+    ax.set_title("Accuracy: Original vs Adversarial", fontsize=12, fontweight="bold")
+    ax.legend(fontsize=10, framealpha=0.85)
+    ax.grid(axis="y", alpha=0.4)
+
+    # ── Right: accuracy drop & evasion rate ───────────────────────────────────
+    ax2 = axes[1]
+    ax2.bar(x - width / 2, accuracy_drops, width, label="Accuracy Drop", color=_PALETTE[2], alpha=0.88, edgecolor="white")
+    ax2.bar(x + width / 2, evasion_rates,  width, label="Evasion Rate",  color=_PALETTE[3], alpha=0.88, edgecolor="white")
+
+    ax2.plot(x - width / 2, accuracy_drops, "o--", color=_PALETTE[2], lw=1.8, ms=7)
+    ax2.plot(x + width / 2, evasion_rates,  "s--", color=_PALETTE[3], lw=1.8, ms=7)
+
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(attack_labels, fontsize=10, rotation=12)
+    ax2.set_ylim(0, max(max(accuracy_drops), max(evasion_rates)) * 1.35 + 0.05)
+    ax2.set_ylabel("Rate", fontsize=12)
+    ax2.set_title("Accuracy Drop & Evasion Rate", fontsize=12, fontweight="bold")
+    ax2.legend(fontsize=10, framealpha=0.85)
+    ax2.grid(axis="y", alpha=0.4)
+
+    fig.tight_layout()
+
+    out_path = save_dir / "adversarial_comparison.png"
+    fig.savefig(out_path, dpi=_DPI, bbox_inches="tight")
+    logger.info("Adversarial comparison plot saved → %s", out_path)
+    return fig
+
+
+def plot_perturbation_effect(
+    X_original: np.ndarray,
+    X_adversarial: np.ndarray,
+    feature_names: list[str] | None = None,
+    n_features: int = 10,
+    save_dir: Path | str | None = None,
+) -> plt.Figure:
+    """
+    Violin / box plot showing the distribution shift per feature after perturbation.
+
+    Returns the Figure.
+    """
+    if save_dir is None:
+        save_dir = getattr(config, "DOCS_DIR", _ROOT_DIR / "docs")
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    n_features = min(n_features, X_original.shape[1])
+    feature_names = feature_names or [f"F{i}" for i in range(n_features)]
+
+    diffs = np.abs(X_adversarial[:, :n_features] - X_original[:, :n_features])
+    df    = pd.DataFrame(diffs, columns=feature_names[:n_features])
+    df_m  = df.melt(var_name="Feature", value_name="Absolute Perturbation")
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    sns.boxplot(data=df_m, x="Feature", y="Absolute Perturbation",
+                palette=_PALETTE * (n_features // len(_PALETTE) + 1), ax=ax,
+                flierprops={"marker": ".", "markersize": 3})
+    ax.set_title("Feature-level Perturbation Effect", fontsize=14, fontweight="bold", pad=12)
+    ax.set_xlabel("Feature", fontsize=11)
+    ax.set_ylabel("Absolute Perturbation", fontsize=11)
+    ax.tick_params(axis="x", rotation=30)
+    fig.tight_layout()
+
+    out_path = save_dir / "perturbation_effect.png"
+    fig.savefig(out_path, dpi=_DPI, bbox_inches="tight")
+    logger.info("Perturbation effect plot saved → %s", out_path)
+    return fig
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# High-level demo function (public API)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def demonstrate_adversarial_attacks(
+    model,
+    scaler,
+    X_test,
+    y_test,
+    docs_dir: Path | str | None = None,
+) -> list[dict]:
+    """
+    Run all three attack types against *model* and produce comparison plots.
+
+    Parameters
+    ----------
+    model, scaler  : trained classifier + its scaler
+    X_test, y_test : evaluation data
+    docs_dir       : where to save plots (default: config.DOCS_DIR)
+
+    Returns
+    -------
+    list of robustness result dicts
+    """
+    if docs_dir is None:
+        docs_dir = getattr(config, "DOCS_DIR", _ROOT_DIR / "docs")
+    docs_dir = Path(docs_dir)
+
+    simulator   = AdversarialAttackSimulator(model, scaler)
+    attack_cfgs = [
+        ("fgsm",                 {"epsilon": 0.1}),
+        ("random_noise",         {"noise_level": 0.05}),
+        ("feature_manipulation", {"feature_indices": list(range(min(5, np.array(X_test).shape[1]))),
+                                  "manipulation_factor": 0.5}),
+    ]
+
+    all_results = []
+    for attack_type, kwargs in attack_cfgs:
+        logger.info("Running %s attack …", attack_type)
+        result = simulator.evaluate_robustness(X_test, y_test, attack_type=attack_type, **kwargs)
+        simulator.print_robustness_report(result)
+        all_results.append(result)
+
+    fig = plot_adversarial_comparison(all_results, save_dir=docs_dir)
+
+    # Perturbation effect for FGSM
+    X_np   = np.asarray(X_test)
+    X_fgsm = simulator.fgsm_attack(X_np, epsilon=0.1)
+    plot_perturbation_effect(X_np, X_fgsm, save_dir=docs_dir)
+
+    return all_results
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Entry point
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _generate_synthetic_data(
+    n_samples: int = 2000,
+    n_features: int = 20,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Synthetic network-traffic data: label 0 = normal, 1 = attack."""
+    rng      = np.random.default_rng(getattr(config, "RANDOM_STATE", 42))
+    n_attack = n_samples // 4
+    n_normal = n_samples - n_attack
+
+    X_normal = rng.normal(0.0, 1.0, (n_normal,  n_features))
+    X_attack = rng.normal(3.5, 1.5, (n_attack,  n_features))
+    X        = np.vstack([X_normal, X_attack])
+    y        = np.hstack([np.zeros(n_normal), np.ones(n_attack)]).astype(int)
+
+    idx = rng.permutation(len(y))
+    return X[idx], y[idx]
+
+
+def main():
+    logger.info("=" * 60)
+    logger.info("Adversarial Attacks — starting")
+    logger.info("=" * 60)
+
+    docs_dir = getattr(config, "DOCS_DIR", _ROOT_DIR / "docs")
+    Path(docs_dir).mkdir(parents=True, exist_ok=True)
+
+    # ── 1. Load data ──────────────────────────────────────────────────────────
+    # ── 1. Load data & Train/Test split ───────────────────────────────────────
+    try:
+        from data_loader import load_dataset          # noqa: PLC0415
+
+        logger.info("Attempting to load NSL-KDD via data_loader …")
+        X_train, X_test, y_train_raw, y_test_raw, source = load_dataset(binary=True)
         
-        simulator.print_robustness_report(results)
-        all_results.append(results)
-    
-    # Plot comparison
-    plot_adversarial_comparison(all_results, save_path='../docs/adversarial_attacks_comparison.png')
-    
-    print("\n" + "="*70)
-    print("Adversarial attacks demonstration completed!")
-    print("="*70)
+        y_train = np.array([1 if val == 'attack' or val == 1 else 0 for val in y_train_raw])
+        y_test  = np.array([1 if val == 'attack' or val == 1 else 0 for val in y_test_raw])
+        X_train = np.asarray(X_train, dtype=float)
+        X_test  = np.asarray(X_test, dtype=float)
+        
+        logger.info("%s loaded — %d train, %d test samples", source, len(X_train), len(X_test))
+    except Exception as exc:
+        logger.warning("data_loader failed (%s); using synthetic data.", exc)
+        logger.info("Generating synthetic data …")
+        X, y = _generate_synthetic_data()
+        
+        test_size    = getattr(config, "TEST_SIZE", 0.20)
+        random_state = getattr(config, "RANDOM_STATE", 42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state, stratify=y
+        )
 
+    # ── 3. Train a reference classifier ───────────────────────────────────────
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s  = scaler.transform(X_test)
 
-def plot_adversarial_comparison(results, save_path=None):
-    """
-    Plot comparison of different adversarial attacks
-    """
-    attack_types = [r['attack_type'].replace('_', '\n') for r in results]
-    
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    
-    # Accuracy comparison
-    original_acc = [r['original_accuracy'] for r in results]
-    adversarial_acc = [r['adversarial_accuracy'] for r in results]
-    
-    x = np.arange(len(attack_types))
-    width = 0.35
-    
-    axes[0].bar(x - width/2, original_acc, width, label='Original', 
-               color='green', alpha=0.7, edgecolor='black')
-    axes[0].bar(x + width/2, adversarial_acc, width, label='After Attack',
-               color='red', alpha=0.7, edgecolor='black')
-    axes[0].set_ylabel('Accuracy', fontsize=12)
-    axes[0].set_title('Model Accuracy: Original vs After Attack', fontsize=13, fontweight='bold')
-    axes[0].set_xticks(x)
-    axes[0].set_xticklabels(attack_types, fontsize=9)
-    axes[0].legend(fontsize=10)
-    axes[0].grid(axis='y', alpha=0.3)
-    axes[0].set_ylim([0, 1.1])
-    
-    # Evasion rate
-    evasion_rates = [r['evasion_rate'] for r in results]
-    colors = ['#e74c3c', '#e67e22', '#f39c12']
-    
-    bars = axes[1].bar(attack_types, evasion_rates, color=colors, 
-                      alpha=0.7, edgecolor='black')
-    axes[1].set_ylabel('Evasion Rate', fontsize=12)
-    axes[1].set_title('Attack Evasion Rate', fontsize=13, fontweight='bold')
-    axes[1].grid(axis='y', alpha=0.3)
-    axes[1].set_ylim([0, 1.1])
-    
-    # Add value labels
-    for bar in bars:
-        height = bar.get_height()
-        axes[1].text(bar.get_x() + bar.get_width()/2., height,
-                   f'{height:.2%}',
-                   ha='center', va='bottom', fontweight='bold')
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"\nAdversarial attacks comparison saved to {save_path}")
-    
-    return plt
+    model = RandomForestClassifier(
+        n_estimators=100,
+        random_state=random_state,
+        n_jobs=getattr(config, "N_JOBS", -1),
+    )
+    model.fit(X_train_s, y_train)
+    base_acc = accuracy_score(y_test, model.predict(X_test_s))
+    logger.info("Reference model accuracy: %.4f", base_acc)
+
+    # ── 4. Demonstrate attacks ────────────────────────────────────────────────
+    # Note: pass the *unscaled* X_test; AdversarialAttackSimulator applies scaler internally.
+    results = demonstrate_adversarial_attacks(model, scaler, X_test, y_test, docs_dir=docs_dir)
+
+    logger.info("Adversarial Attacks — done.")
+    plt.show()
+    return results
 
 
 if __name__ == "__main__":
-    demonstrate_adversarial_attacks()
+    main()
