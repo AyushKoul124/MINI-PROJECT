@@ -392,6 +392,7 @@ def main():
     logger.info("=" * 60)
 
     docs_dir = getattr(config, "DOCS_DIR", _ROOT_DIR / "docs")
+    random_state = getattr(config, "RANDOM_STATE", 42)
     Path(docs_dir).mkdir(parents=True, exist_ok=True)
 
     # ── 1. Load data ──────────────────────────────────────────────────────────
@@ -414,7 +415,6 @@ def main():
         X, y = _generate_synthetic_data()
         
         test_size    = getattr(config, "TEST_SIZE", 0.20)
-        random_state = getattr(config, "RANDOM_STATE", 42)
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=test_size, random_state=random_state, stratify=y
         )
