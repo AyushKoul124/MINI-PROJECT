@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
 
 > **Project 16 — Implementation of an AI-Based Cybersecurity Use Case**  
-> *Security & Privacy — Medicine & Big Data | Université Sétif 1 | Academic Year 2025/2026*
+> *Model Institute of Engineering and Technology (Autonomous)*
 
 A comprehensive Machine Learning framework for network intrusion detection, anomaly analysis,
 multi-class traffic classification, and adversarial-robustness evaluation — all wrapped in an
@@ -269,14 +269,13 @@ MINI-PROJECT/
 
 ---
 
-## 👩‍💻 Authors
+## 👨‍💻 Authors
 
-| Name               | Role                                          | Institution         |
-|--------------------|-----------------------------------------------|---------------------|
-| **DAHEL Rahma**    | Security & Privacy — Medicine & Big Data      | Université Sétif 1  |
-| **GHEDJATI Zainab**| Security & Privacy — Medicine & Big Data      | Université Sétif 1  |
-
-> Academic Year: 2025/2026
+| Name                       | Role                                     | Institution                                              |
+|----------------------------|------------------------------------------|----------------------------------------------------------|
+| **Ayush Koul**             | AI-Based Cybersecurity Mini-Project      | Model Institute of Engineering and Technology (Autonomous) |
+| **Vinayak Singh Jamwal**   | AI-Based Cybersecurity Mini-Project      | Model Institute of Engineering and Technology (Autonomous) |
+| **Prajwal Shan**           | AI-Based Cybersecurity Mini-Project      | Model Institute of Engineering and Technology (Autonomous) |
 
 ---
 
