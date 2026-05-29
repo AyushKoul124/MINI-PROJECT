@@ -415,35 +415,31 @@ if page == "🏠 Overview":
     # ---- Use Cases ----
     st.markdown("<div class='section-title'>🌍 Real-World Use Cases</div>", unsafe_allow_html=True)
     st.markdown(
-        """
-        <div class='info-card'>
-            <h4>🏢 Enterprise Security Operations Center (SOC)</h4>
-            <p><strong>Implementation:</strong> The <em>Traffic Classification</em> and <em>Intrusion Detection</em> models can be deployed at the network edge (e.g., firewall or router). When raw network packets enter the enterprise, a packet sniffer (like Zeek) extracts the 41 features in real time. The AI model classifies the traffic instantly—allowing Normal traffic to pass and automatically dropping DoS attacks, while flagging U2R attacks for a human analyst.</p>
-            
-            <h4>🦠 Zero-Day Threat Hunting</h4>
-            <p><strong>Implementation:</strong> Traditional antiviruses rely on signatures of known malware and fail against zero-day (brand new) attacks. Our <em>Anomaly Detection</em> model (Isolation Forest) trains <strong>only</strong> on normal traffic. In a corporate environment, if a new ransomware begins exfiltrating data, it will deviate from the mathematical baseline of normal traffic, triggering an immediate anomaly alert before a signature even exists.</p>
-            
-            <h4>🛡️ Red Team vs. Blue Team (Adversarial Auditing)</h4>
-            <p><strong>Implementation:</strong> Hackers use AI to evade AI (Adversarial Attacks). Our <em>Adversarial Attack Simulator</em> demonstrates how slightly perturbing packet features (e.g., adding noise to packet size) can fool the IDS. Security engineers use this module to dynamically generate adversarial samples and retrain the models on them, creating a hardened, robust defense system.</p>
-        </div>
-        """,
+        """<div class='info-card'>
+    <h4>🏢 Enterprise Security Operations Center (SOC)</h4>
+    <p><strong>Implementation:</strong> The <em>Traffic Classification</em> and <em>Intrusion Detection</em> models can be deployed at the network edge (e.g., firewall or router). When raw network packets enter the enterprise, a packet sniffer (like Zeek) extracts the 41 features in real time. The AI model classifies the traffic instantly—allowing Normal traffic to pass and automatically dropping DoS attacks, while flagging U2R attacks for a human analyst.</p>
+    
+    <h4>🦠 Zero-Day Threat Hunting</h4>
+    <p><strong>Implementation:</strong> Traditional antiviruses rely on signatures of known malware and fail against zero-day (brand new) attacks. Our <em>Anomaly Detection</em> model (Isolation Forest) trains <strong>only</strong> on normal traffic. In a corporate environment, if a new ransomware begins exfiltrating data, it will deviate from the mathematical baseline of normal traffic, triggering an immediate anomaly alert before a signature even exists.</p>
+    
+    <h4>🛡️ Red Team vs. Blue Team (Adversarial Auditing)</h4>
+    <p><strong>Implementation:</strong> Hackers use AI to evade AI (Adversarial Attacks). Our <em>Adversarial Attack Simulator</em> demonstrates how slightly perturbing packet features (e.g., adding noise to packet size) can fool the IDS. Security engineers use this module to dynamically generate adversarial samples and retrain the models on them, creating a hardened, robust defense system.</p>
+</div>""",
         unsafe_allow_html=True,
     )
 
     # ---- Accuracy Disclaimer ----
     st.markdown("<div class='section-title'>📈 Evaluation & Accuracy Disclaimer</div>", unsafe_allow_html=True)
     st.markdown(
-        """
-        <div class='info-card' style='border-left: 4px solid #f39c12;'>
-            <h4>🤔 Why is the Accuracy so High (~98%)?</h4>
-            <p>During presentations, evaluators often question high accuracy metrics, suspecting <strong>overfitting</strong> or <strong>data leakage</strong>. Here is the mathematical defense of our model:</p>
-            <ol style='margin-left: 1.2rem; margin-top: 0.5rem;'>
-                <li><strong>Benchmark Dataset Characteristics:</strong> The NSL-KDD dataset is a highly structured, offline benchmark. Because the dataset provides 41 perfectly clean, engineered features, modern ensemble algorithms (like Random Forest) can easily partition the mathematical boundaries between 'Normal' and 'Attack' traffic. Real-time, chaotic traffic would naturally yield lower accuracy.</li>
-                <li><strong>Strict Overfitting Prevention:</strong> We did not overfit the model. Our pipeline uses a strict Train/Test split, ensuring the model is evaluated on completely unseen data. Furthermore, we validated consistency using Stratified K-Fold Cross-Validation.</li>
-                <li><strong>Proving Vulnerability (Adversarial Tests):</strong> To prove the model isn't "magic", our <em>Adversarial Attacks</em> module demonstrates that when we intentionally inject noise (FGSM) into the test packets, the accuracy drops significantly. This proves the model relies on clean feature signatures, validating the need for continuous adversarial training.</li>
-            </ol>
-        </div>
-        """,
+        """<div class='info-card' style='border-left: 4px solid #f39c12;'>
+    <h4>🤔 Why is the Accuracy so High (~98%)?</h4>
+    <p>During presentations, evaluators often question high accuracy metrics, suspecting <strong>overfitting</strong> or <strong>data leakage</strong>. Here is the mathematical defense of our model:</p>
+    <ol style='margin-left: 1.2rem; margin-top: 0.5rem;'>
+        <li><strong>Benchmark Dataset Characteristics:</strong> The NSL-KDD dataset is a highly structured, offline benchmark. Because the dataset provides 41 perfectly clean, engineered features, modern ensemble algorithms (like Random Forest) can easily partition the mathematical boundaries between 'Normal' and 'Attack' traffic. Real-time, chaotic traffic would naturally yield lower accuracy.</li>
+        <li><strong>Strict Overfitting Prevention:</strong> We did not overfit the model. Our pipeline uses a strict Train/Test split, ensuring the model is evaluated on completely unseen data. Furthermore, we validated consistency using Stratified K-Fold Cross-Validation.</li>
+        <li><strong>Proving Vulnerability (Adversarial Tests):</strong> To prove the model isn't "magic", our <em>Adversarial Attacks</em> module demonstrates that when we intentionally inject noise (FGSM) into the test packets, the accuracy drops significantly. This proves the model relies on clean feature signatures, validating the need for continuous adversarial training.</li>
+    </ol>
+</div>""",
         unsafe_allow_html=True,
     )
 
