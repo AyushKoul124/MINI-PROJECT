@@ -412,6 +412,24 @@ if page == "🏠 Overview":
         language="",
     )
 
+    # ---- Use Cases ----
+    st.markdown("<div class='section-title'>🌍 Real-World Use Cases</div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class='info-card'>
+            <h4>🏢 Enterprise Security Operations Center (SOC)</h4>
+            <p><strong>Implementation:</strong> The <em>Traffic Classification</em> and <em>Intrusion Detection</em> models can be deployed at the network edge (e.g., firewall or router). When raw network packets enter the enterprise, a packet sniffer (like Zeek) extracts the 41 features in real time. The AI model classifies the traffic instantly—allowing Normal traffic to pass and automatically dropping DoS attacks, while flagging U2R attacks for a human analyst.</p>
+            
+            <h4>🦠 Zero-Day Threat Hunting</h4>
+            <p><strong>Implementation:</strong> Traditional antiviruses rely on signatures of known malware and fail against zero-day (brand new) attacks. Our <em>Anomaly Detection</em> model (Isolation Forest) trains <strong>only</strong> on normal traffic. In a corporate environment, if a new ransomware begins exfiltrating data, it will deviate from the mathematical baseline of normal traffic, triggering an immediate anomaly alert before a signature even exists.</p>
+            
+            <h4>🛡️ Red Team vs. Blue Team (Adversarial Auditing)</h4>
+            <p><strong>Implementation:</strong> Hackers use AI to evade AI (Adversarial Attacks). Our <em>Adversarial Attack Simulator</em> demonstrates how slightly perturbing packet features (e.g., adding noise to packet size) can fool the IDS. Security engineers use this module to dynamically generate adversarial samples and retrain the models on them, creating a hardened, robust defense system.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # ---- Team ----
     st.markdown("<div class='section-title'>👨‍💻 Authors</div>", unsafe_allow_html=True)
     a1, a2, a3 = st.columns(3)
