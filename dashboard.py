@@ -180,13 +180,13 @@ def _try_import(module_name, alias=None):
     try:
         import importlib
         mod = importlib.import_module(module_name)
+        importlib.reload(mod)
         return mod
     except Exception as exc:
         _import_errors[key] = str(exc)
         return None
 
-# Attempt imports once (cached across reruns via module-level cache)
-@st.cache_resource(show_spinner=False)
+# Load modules dynamically on every run to prevent memory caching issues
 def _load_modules():
     mods = {}
     mods['intrusion_detection']    = _try_import('intrusion_detection')
@@ -581,7 +581,7 @@ elif page == "📡 Anomaly Detection":
                     }
                     cols = st.columns(2)
                     for idx, (method, res) in enumerate(results.items()):
-                        m   = res['metrics']
+                        m   = res.get('metrics', res)
                         lbl = method_labels.get(method, method)
                         with cols[idx]:
                             st.metric(f"{lbl} Accuracy", f"{m['accuracy']*100:.2f}%")
@@ -611,9 +611,12 @@ elif page == "📡 Anomaly Detection":
             y_test_binary = st.session_state['ad_y_bin']
             chosen = st.selectbox("Select method", list(results.keys()),
                                   format_func=lambda x: x.replace('_', ' ').title())
-            detector = results[chosen]['detector']
-            detector.plot_roc_curve(X_test, y_test_binary)
-            _show_current_figure(f"ROC Curve – {chosen.replace('_',' ').title()}")
+            if 'detector' in results[chosen]:
+                detector = results[chosen]['detector']
+                detector.plot_roc_curve(X_test, y_test_binary)
+                _show_current_figure(f"ROC Curve – {chosen.replace('_',' ').title()}")
+            else:
+                st.error("⚠️ Detector model not found in results. Please re-run the Analysis in Tab 1.")
 
 # ===========================================================================
 # PAGE: Traffic Classification
