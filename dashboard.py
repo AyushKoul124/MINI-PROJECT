@@ -613,8 +613,9 @@ elif page == "📡 Anomaly Detection":
                                   format_func=lambda x: x.replace('_', ' ').title())
             if 'detector' in results[chosen]:
                 detector = results[chosen]['detector']
-                detector.plot_roc_curve(X_test, y_test_binary)
-                _show_current_figure(f"ROC Curve – {chosen.replace('_',' ').title()}")
+                label = chosen.replace('_', ' ').title()
+                ad_mod.plot_roc_curves([(label, detector)], X_test, y_test_binary)
+                _show_current_figure(f"ROC Curve – {label}")
             else:
                 st.error("⚠️ Detector model not found in results. Please re-run the Analysis in Tab 1.")
 
