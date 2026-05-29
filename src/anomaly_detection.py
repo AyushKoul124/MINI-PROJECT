@@ -211,7 +211,7 @@ def compare_anomaly_methods(
         detector = AnomalyDetector(method=method)
         detector.fit(X_train)
         metrics, _ = detector.evaluate(X_test, y_test)
-        results[method] = metrics
+        results[method] = {'metrics': metrics, 'detector': detector}
 
         # optional cross-validation
         if cv_folds > 1:
@@ -225,18 +225,19 @@ def compare_anomaly_methods(
                 d.fit(X_all[train_idx])
                 m, _ = d.evaluate(X_all[val_idx], y_all[val_idx])
                 cv_f1s.append(m["f1_score"])
-            results[method]["cv_f1_mean"] = float(np.mean(cv_f1s))
-            results[method]["cv_f1_std"]  = float(np.std(cv_f1s))
+            results[method]['metrics']["cv_f1_mean"] = float(np.mean(cv_f1s))
+            results[method]['metrics']["cv_f1_std"]  = float(np.std(cv_f1s))
             logger.info(
                 "  %s CV(%d) F1: %.4f ± %.4f",
-                method, cv_folds, results[method]["cv_f1_mean"], results[method]["cv_f1_std"],
+                method, cv_folds, results[method]['metrics']["cv_f1_mean"], results[method]['metrics']["cv_f1_std"],
             )
 
     # ── Pretty comparison table ────────────────────────────────────────────
     header = f"{'Method':<22}{'Accuracy':>10}{'Precision':>11}{'Recall':>9}{'F1':>9}{'AUC':>9}"
     sep    = "─" * len(header)
     print(f"\n{sep}\n{header}\n{sep}")
-    for method, m in results.items():
+    for method, res_dict in results.items():
+        m = res_dict['metrics']
         label = method.replace("_", " ").title()
         row = (
             f"{label:<22}{m['accuracy']:>10.4f}{m['precision']:>11.4f}"
@@ -271,7 +272,8 @@ def plot_anomaly_comparison(
 
     fig, ax = plt.subplots(figsize=(11, 6))
     for i, (method, label) in enumerate(zip(results, method_labels)):
-        vals = [results[method].get(m, 0) for m in metrics_to_plot]
+        m = results[method]['metrics']
+        vals = [m.get(met, 0) for met in metrics_to_plot]
         bars = ax.bar(x + i * width, vals, width, label=label,
                       color=_PALETTE[i % len(_PALETTE)], alpha=0.88,
                       edgecolor="white", linewidth=0.8)

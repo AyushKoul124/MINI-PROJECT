@@ -581,7 +581,7 @@ elif page == "📡 Anomaly Detection":
                     }
                     cols = st.columns(2)
                     for idx, (method, res) in enumerate(results.items()):
-                        m   = res
+                        m   = res['metrics']
                         lbl = method_labels.get(method, method)
                         with cols[idx]:
                             st.metric(f"{lbl} Accuracy", f"{m['accuracy']*100:.2f}%")
