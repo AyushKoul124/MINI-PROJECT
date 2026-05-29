@@ -61,3 +61,21 @@ Panel aapko grill karne ki koshish karegi. Yahan kuch expected questions aur unk
 ### Q5: "What was the most difficult part of this project?"
 **Your Answer:**
 > "Sabse challenging part tha **Data Preprocessing**. NSL-KDD mein 41 features hain, jisme se kuch text (categorical) hain aur kuch continuous numbers hain. Unko machine learning ke liye proper numerical format mein StandardScaler aur LabelEncoder se map karna, aur phir real-time dashboard ke sath smoothly connect karna kaafi complex tha. Uske baad Streamlit UI ko interactive banana taaki background mein heavy ML models jaldi run ho sakein, ek bada challenge tha."
+
+---
+
+### Q6: "How did you do Data Preprocessing?"
+**Your Answer:**
+> "Sir/Ma'am, NSL-KDD dataset mein 41 features hain. Inme se kuch features numerical hain (jaise *src_bytes* ya *duration*) aur kuch categorical/text hain (jaise *protocol_type* -> 'tcp', 'udp'). 
+> 
+> ML models text ko nahi samajhte, isliye humne preprocessing ke 2 main steps kiye:
+> 1. **Label Encoding:** Humne `LabelEncoder` use karke text features ko numbers (0, 1, 2) mein convert kiya.
+> 2. **Feature Scaling:** *src_bytes* ki value millions mein ho sakti hai, jabki *duration* choti hoti hai. Bias hatane ke liye humne `StandardScaler` use kiya, jo saare features ko ek common mathematical scale (mean 0, standard deviation 1) par le aata hai taaki sabhi features ko equal importance mile."
+
+### Q7: "What is Overfitting and how did you prevent it?"
+**Your Answer (Student Analogy):**
+> "It is like a student who memorizes a textbook word-for-word instead of understanding the underlying concepts. Agar exam mein textbook ke exact questions aaye, toh wo 100% score karega, lekin naye questions aane par fail ho jayega."
+>
+> "Machine learning mein, Overfitting tab hota hai jab model training data ke exact patterns ko completely memorize kar leta hai, instead of actually learning the concept. Is wajah se training accuracy 100% aati hai, par naye data (test data) par wo fail ho jata hai.
+> 
+> **How we prevented it:** Humara model overfit nahi kar raha hai kyunki humne strict `train_test_split` use kiya hai. Humne model ko 1,25,000 records par train kiya, aur uski accuracy un 22,000 test records par measure ki jo usne training ke time kabhi nahi dekhe the. Unseen data par bhi accuracy 99% aayi hai, which proves ki model ne patterns successfully learn kiye hain, data ko memorize nahi kiya."
