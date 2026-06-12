@@ -1,4 +1,4 @@
-# 🛡️ AI-Based Cybersecurity System
+# 🛡️ AI-Based Cybersecurity Network Intrusion Detection System (NIDS)
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.x-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
