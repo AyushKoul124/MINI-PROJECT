@@ -6,7 +6,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
 
 > **Project 16 — Implementation of an AI-Based Cybersecurity Use Case**  
-> *Model Institute of Engineering and Technology (Autonomous)*
 
 A comprehensive Machine Learning framework for network intrusion detection, anomaly analysis,
 multi-class traffic classification, and adversarial-robustness evaluation — all wrapped in an
@@ -273,9 +272,9 @@ MINI-PROJECT/
 
 | Name                       | Role                                     | Institution                                              |
 |----------------------------|------------------------------------------|----------------------------------------------------------|
-| **Ayush Koul**             | AI-Based Cybersecurity Mini-Project      | Model Institute of Engineering and Technology (Autonomous) |
-| **Vinayak Singh Jamwal**   | AI-Based Cybersecurity Mini-Project      | Model Institute of Engineering and Technology (Autonomous) |
-| **Prajwal Shan**           | AI-Based Cybersecurity Mini-Project      | Model Institute of Engineering and Technology (Autonomous) |
+| **Ayush Koul**             | Front end, AI research                   | Model Institute of Engineering and Technology (Autonomous) |
+| **Vinayak Singh Jamwal**   | AI research, ML research                 | Model Institute of Engineering and Technology (Autonomous) |
+| **Prajwal Shan**           | Backend, Implementation                  | Model Institute of Engineering and Technology (Autonomous) |
 
 ---
 
